@@ -48,7 +48,7 @@ set_session(tf.Session(config=config))
 
 
 # load labels
-labels = pd.read_csv("../dataset/label.csv")
+labels = pd.read_csv("../dataset/label_15000.csv")
 
 
 # In[ ]:
@@ -71,6 +71,7 @@ X_May = pd.DataFrame(X_May)
 
 
 max_length = 1000
+start_time = time.time()
 
 class ClassifyGenerator(keras.utils.Sequence):
     'Generates data for Keras'
@@ -116,7 +117,8 @@ class ClassifyGenerator(keras.utils.Sequence):
 
         # Generate data
         for i, ID in enumerate(list_IDs_temp):
-            base_path = "../dataset/dataset/{0}.npy"
+            # base_path = "../dataset/dataset/{0}.npy"
+            base_path = "../Dataset/dataset/dataset/{0}.npy"
             item = self.datasets.iloc[ID]
             self_name = item['file_name']
             tmp = np.load(base_path.format(self_name))
@@ -136,32 +138,67 @@ class ClassifyGenerator(keras.utils.Sequence):
 
 
 class Model():
-    def __init__(self):
-        self.start_time = time.time()
-
-    def get_model(self, model_path = None):  
+    def get_model(self, model_path=None):
         if model_path is None:
-            params_input = Input(shape=(max_length, 102))
-            
-            x = BatchNormalization()(params_input)
-            
-            x_0 = Conv1D(128, 2, strides=1, padding='same')(x)
-            x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same')(x)
-            gated_0 = Multiply()([x_0, x_1])
-            
-            x_0 = Conv1D(128, 3, strides=1, padding='same')(x)
-            x_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same')(x)
-            gated_1 = Multiply()([x_0, x_1])
-            
-            x  = Concatenate()([gated_0, gated_1])
-            x = BatchNormalization()(x)
-            
-            x = Bidirectional(LSTM(100, return_sequences=True))(x)
-            
-            x = GlobalMaxPooling1D()(x)
 
-            x = Dense(64)(x)
-            x = Activation('relu')(x)
+            params_input = Input(shape=(max_length, 102), name="input_layer") #shape = (?,1000,102)
+
+
+            # params_embedding = Embedding(input_dim= 5625 + 1 , output_dim= 102)(params_input)
+            #
+            # x = BatchNormalization(name="batch_normalization_1")(params_embedding)
+            #
+            # x_0 = Conv2D(filters=128, kernel_size= (3,16),strides=1,padding="same")(x)
+            # x_1 = Conv2D(filters=128, kernel_size= (3,16),strides=1,padding="same", activation='sigmoid')(x)
+            # gated_0 = Multiply()([x_0, x_1])
+            #
+            # x_0 = Conv2D(filters=128, kernel_size= (4,16),strides=1,padding="same")(x)
+            # x_1 = Conv2D(filters=128, kernel_size= (4,16),strides=1,padding="same", activation='sigmoid')(x)
+            # gated_1 = Multiply()([x_0, x_1])
+            #
+            # x_0 = Conv2D(filters=128, kernel_size= (5,16),strides=1,padding="same")(x)
+            # x_1 = Conv2D(filters=128, kernel_size= (5,16),strides=1,padding="same", activation='sigmoid')(x)
+            # gated_2 = Multiply()([x_0, x_1])
+            # # GlobalMaxPooling1D()(gated_0)降维试试看？？？
+            # x = Concatenate()([gated_0, gated_1, gated_2])
+            # x = GlobalMaxPooling2D()(x)
+
+            # # # 改进1  自编码器
+            # encoded_0 = Dense(1024, activation='sigmoid')(x)
+            # encoded_0 = Dropout(0.5)(encoded_0)
+            # encoded_0 = Dense(256, activation='sigmoid')(encoded_0)
+            # encoded_0 = Dropout(0.5)(encoded_0)
+            # encoded_0 = Dense(64, activation='sigmoid')(encoded_0)
+
+            #------------------------------------
+
+
+            x = BatchNormalization(name="batch_normalization_2")(params_input)
+
+            # x_0 = Conv1D(128, 2, strides=1, padding='same', name="conv1d_2_1")(x)
+            x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same', name="conv1d_2_2")(x)
+            # gated_0 = Multiply()([x_0, x_1])
+            gated_0 = x_1
+
+            # 这一部分应该是后续可以改进模型的地方
+            # x_0 = Conv1D(128, 3, strides=1, padding='same', name="conv1d_3_1")(x)
+            x_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same', name="conv1d_3_2")(x)
+            # gated_1 = Multiply()([x_0, x_1])
+            gated_1 = x_1
+
+            # x_0 = Conv1D(128, 4, strides=1, padding='same', name="conv1d_4_1")(x)
+            x_1 = Conv1D(128, 4, strides=1, activation="sigmoid", padding='same', name="conv1d_4_2")(x)
+            # gated_2 = Multiply()([x_0, x_1])
+            gated_2 = x_1
+
+            x = Concatenate()([gated_0, gated_1, gated_2])
+            x = BatchNormalization(name="batch_normalization")(x)
+
+            x = Bidirectional(LSTM(64, return_sequences=True), name="bidirectional")(x)
+            x = GlobalMaxPooling1D(name="global_max_pooling1d")(x)
+
+            # x = Concatenate()([x, encoded_0])
+            x = Dense(64,activation='relu')(x)
             x = Dropout(0.5)(x)
             x = Dense(1)(x)
 
@@ -171,13 +208,14 @@ class Model():
             model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
         else:
             model = load_model(model_path)
-            
         model.summary()
+
+        keras.utils.vis_utils.plot_model(model, to_file='./struct_model/model_autocode_9.png',
+                                         show_shapes=True)
         return model
 
     def train(self, max_epoch, batch_size, x_train, y_train, x_val, y_val, x_test, y_test):
         model = self.get_model()
-        class_name = self.__class__.__name__
 
         print('Length of the train: ', len(x_train))
         print('Length of the validation: ', len(x_val))
@@ -192,9 +230,7 @@ class Model():
         #If the program is running on Windows OS, you can remove "use_multiprocessing=True," and "workers=6,".
         model.fit_generator(generator=training_generator,
                             validation_data=validation_generator,
-                            use_multiprocessing=True,
                             epochs=max_epoch,
-                            workers=6,
                             callbacks=callbacks_list
                            )
         return model
@@ -278,3 +314,5 @@ for fold_n in range(n_fold):
     y_pred = predict(model_name, x_test, y_test)
     print("acc", accuracy_score((y_pred>0.5).astype('int'), y_test[:len(y_pred)]))
     plot_recall(y_test, y_pred)
+    end_time = time.time()
+    print((end_time - start_time)/3600)
