@@ -138,117 +138,60 @@ class ClassifyGenerator(keras.utils.Sequence):
 # In[ ]:
 
 
-class Model():
-    def get_model(self, model_path=None):
-        if model_path is None:
+def get_model(self, model_path = None):
+    if model_path is None:
+        params_input = Input(shape=(max_length, 102),name="input_layer")
 
-            params_input = Input(shape=(max_length, 102), name="input_layer") #shape = (?,1000,102)
+        #Conv1D模型
+        x = BatchNormalization(name="batch_normalization_1")(params_input)
+        x_0 = Conv1D(128, 2, strides=1, padding='same',name="conv1d_2_1")(x)
+        x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same',name="conv1d_2_2")(x)
+        gated_0 = Multiply()([x_0, x_1])
 
-            params_embedding = Embedding(input_dim= 5625 + 1 , output_dim= 102)(params_input)
-            # params_embedding = tf.reduce_mean(params_embedding, axis=2)
-            # x = BatchNormalization(name="batch_normalization_1")(params_embedding) #(?,1000,102)
+        # 这一部分应该是后续可以改进模型的地方
+        x_0 = Conv1D(128, 3, strides=1, padding='same',name="conv1d_3_1")(x)
+        x_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same',name="conv1d_3_2")(x)
+        gated_1 = Multiply()([x_0, x_1])
 
-            x = params_embedding
+        #编码层
+        params_embedding = Embedding(input_dim=5625 + 1, output_dim=102)(params_input)
+        params_embedding = tf.reduce_mean(params_embedding, axis=2)
+        x_encode = BatchNormalization(name="batch_normalization_1")(params_embedding) #(?,1000,102)
 
-            x_0 = Conv2D(filters=128, kernel_size= (3,16),strides=1,padding="same")(x)
-            x_1 = Conv2D(filters=128, kernel_size= (3,16),strides=1,padding="same", activation='sigmoid')(x)
-            gated_0 = Multiply()([x_0, x_1])
-
-            x_0 = Conv2D(filters=128, kernel_size= (4,16),strides=1,padding="same")(x)
-            x_1 = Conv2D(filters=128, kernel_size= (4,16),strides=1,padding="same", activation='sigmoid')(x)
-            gated_1 = Multiply()([x_0, x_1])
-
-            x_0 = Conv2D(filters=128, kernel_size= (5,16),strides=1,padding="same")(x)
-            x_1 = Conv2D(filters=128, kernel_size= (5,16),strides=1,padding="same", activation='sigmoid')(x)
-            gated_2 = Multiply()([x_0, x_1])
-
-            x_embedding = Concatenate()([gated_0, gated_1, gated_2])
-            x_embedding = tf.reduce_sum(x_embedding, axis=2)
-
-            # # # 改进1  自编码器
-            # encoded_0 = Dense(1024, activation='sigmoid')(x)
-            # encoded_0 = Dropout(0.5)(encoded_0)
-            # encoded_0 = Dense(256, activation='sigmoid')(encoded_0)
-            # encoded_0 = Dropout(0.5)(encoded_0)
-            # encoded_0 = Dense(64, activation='sigmoid')(encoded_0)
-
-            #------------------------------------
-
-            # x = BatchNormalization(name="batch_normalization_2")(params_input)
-            #
-            # x_0 = Conv1D(128, 2, strides=1, padding='same', name="conv1d_2_1")(x)
-            # x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same', name="conv1d_2_2")(x)
-            # gated_0 = Multiply()([x_0, x_1])
-            #
-            # # 这一部分应该是后续可以改进模型的地方
-            # x_0 = Conv1D(128, 3, strides=1, padding='same', name="conv1d_3_1")(x)
-            # x_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same', name="conv1d_3_2")(x)
-            # gated_1 = Multiply()([x_0, x_1])
-            #
-            # x_0 = Conv1D(128, 4, strides=1, padding='same', name="conv1d_4_1")(x)
-            # x_1 = Conv1D(128, 4, strides=1, activation="sigmoid", padding='same', name="conv1d_4_2")(x)
-            # gated_2 = Multiply()([x_0, x_1])
-            #
-            # # 改进1  自编码器
-            # x_encode = Concatenate()([gated_0,gated_1,gated_2])
-
-            # x_tmp_0 = GlobalMaxPooling1D()(x_encode)
-            # encoded_0 = Dense(1024, activation='sigmoid')(x_tmp_0)
-            # encoded_0 = Dropout(0.5)(encoded_0)
-            # encoded_0 = Dense(512, activation='sigmoid')(encoded_0)
-            # encoded_0 = Dropout(0.5)(encoded_0)
-            # encoded_0 = Dense(256, activation='sigmoid')(encoded_0)
-            # encoded_0 = Dropout(0.5)(encoded_0)
-            # encoded_0 = Dense(128, activation='sigmoid')(encoded_0)
-
-            # encoded_0 = keras.layers.core.RepeatVector(1000)(encoded_0)
-
-            # x = Concatenate()([gated_0, gated_1, gated_2, x_embedding])
-            x = BatchNormalization(name="batch_normalization")(x_embedding)
-
-            x = Bidirectional(LSTM(100, return_sequences=True), name="bidirectional")(x)
-            # x = Bidirectional(GRU(100, return_sequences=True), name="bidirectional")(x)
-
-            x = GlobalMaxPooling1D(name="global_max_pooling1d")(x)
+        # 改进 自编码器
+        x_tmp_0 = GlobalMaxPooling1D()(x_encode)
+        encoded_0 = Dense(512, activation='sigmoid')(x_tmp_0)
+        encoded_0 = Dropout(0.5)(encoded_0)
+        encoded_0 = Dense(256, activation='sigmoid')(encoded_0)
+        encoded_0 = Dropout(0.5)(encoded_0)
+        encoded_0 = Dense(128, activation='sigmoid')(encoded_0)
 
 
-            # x = Concatenate()([x, encoded_0])
-            x = Dense(64,activation='relu')(x)
-            x = Dropout(0.5)(x)
-            x = Dense(1)(x)
+        x = Concatenate()([gated_0, gated_1,encoded_0])
+        x = BatchNormalization(name="batch_normalization_2")(x)
 
-            net_output = Activation('sigmoid')(x)
+        #修改原来的参数100为64
+        x = Bidirectional(LSTM(64, return_sequences=True),name="bidirectional")(x)
 
-            model = keras.models.Model(inputs=[params_input], outputs=net_output)
-            model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-        else:
-            model = load_model(model_path)
-        model.summary()
+        x = GlobalMaxPooling1D(name="global_max_pooling1d")(x)
 
-        keras.utils.vis_utils.plot_model(model, to_file='./struct_model/model_autocode_9.png',
-                                         show_shapes=True)
-        return model
+        # x = Concatenate()([x, encoded_0, encoded_1])
+        x = Dense(64)(x)
+        x = Activation('relu')(x)
+        x = Dropout(0.5)(x)
+        x = Dense(1)(x)
 
-    def train(self, max_epoch, batch_size, x_train, y_train, x_val, y_val, x_test, y_test):
-        model = self.get_model()
+        net_output = Activation('sigmoid')(x)
 
-        print('Length of the train: ', len(x_train))
-        print('Length of the validation: ', len(x_val))
-        print('Length of the test: ', len(x_test))
-        
-        training_generator = ClassifyGenerator(range(len(x_train)), x_train, y_train, batch_size)
-        validation_generator = ClassifyGenerator(range(len(x_val)), x_val, y_val, batch_size, shuffle=False)
-        
-        es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
-        callbacks_list = [es]
-        
-        #If the program is running on Windows OS, you can remove "use_multiprocessing=True," and "workers=6,".
-        model.fit_generator(generator=training_generator,
-                            validation_data=validation_generator,
-                            epochs=max_epoch,
-                            callbacks=callbacks_list
-                           )
-        return model
+        model = keras.models.Model(inputs=[params_input], outputs=net_output)
+        model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    else:
+        model = load_model(model_path)
+
+    model.summary()
+
+    keras.utils.vis_utils.plot_model(model,to_file='./struct_model/model_autocode_best_change_param.png',show_shapes= True)
+    return model
 
 
 # In[ ]:
