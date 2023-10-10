@@ -32,6 +32,7 @@ set_session(tf.compat.v1.Session(config=config))
 #超参数
 max_length = 1000
 
+
 class ClassifyGenerator(keras.utils.Sequence):
     'Generates data for Keras'
 

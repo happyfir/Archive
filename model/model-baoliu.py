@@ -154,6 +154,7 @@ class Model():
             # z_r = Concatenate(axis=1)([eu_dist, cos_sim, encoded])
 
 
+
             x = Concatenate()([gated_0, gated_1])
             inputData = BatchNormalization(name="batch_normalization_2")(x)
 
