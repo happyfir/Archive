@@ -7,7 +7,7 @@ import tensorflow as tf
 import keras
 from keras.models import load_model
 from keras.layers import Input, BatchNormalization, Conv1D, Multiply, Concatenate, Bidirectional, LSTM, Embedding, \
-    Lambda
+    Lambda, Layer, GRU, Flatten, Reshape
 from keras.layers import GlobalMaxPooling1D, Dense, Activation, Dropout
 from keras.callbacks import EarlyStopping
 from keras.backend.tensorflow_backend import set_session
@@ -98,64 +98,83 @@ class Model():
     #可以使用keras.utils.plot_model()函数绘制模型图
     def get_model(self, model_path=None):
         if model_path is None:
-            self.params_input = Input(shape=(max_length, 102), name="input_layer")# (?,1000,102)
+            params_input = Input(shape=(max_length, 102), name="input_layer")# (?,1000,102)
+
+            # x_encode = Flatten()(params_input)
+            # encoded_0 = Dense(512, activation='relu')(x_encode)
+            # encoded_0 = Dropout(0.5)(encoded_0)
+            # encoded_0 = Dense(128, activation='relu')(encoded_0)
+            # encoded_0 = Dropout(0.5)(encoded_0)
+            # encoded_0 = Dense(64, activation='relu')(encoded_0)
+            # encoded_0 = Dropout(0.5)(encoded_0)
+            # encoded_0 = Dense(8, activation='relu')(encoded_0)
+            #
+            # decoded_0 = Dense(64, activation='relu')(encoded_0)
+            # decoded_0 = Dropout(0.5)(decoded_0)
+            # decoded_0 = Dense(128, activation='relu')(decoded_0)
+            # decoded_0 = Dropout(0.5)(decoded_0)
+            # decoded_0 = Dense(512, activation='relu')(decoded_0)
+            # decoded_0 = Dense(1000 * 102, activation='sigmoid')(decoded_0)
+            # decoded_0 = Reshape(target_shape=(max_length, 102))(decoded_0)
+
 
             # 原来的模型
-            self.x = BatchNormalization(name="batch_normalization_1")(self.params_input)
-            self.x_0 = Conv1D(128, 2, strides=1, padding='same')(self.x)
-            self.x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same')(self.x)
-            self.gated_0 = Multiply()([self.x_0, self.x_1])
+            x = BatchNormalization(name="batch_normalization_1")(params_input)
+            x_0 = Conv1D(128, 2, strides=1, padding='same')(x)
+            x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same')(x)
+            gated_0 = Multiply()([x_0, x_1])
 
-            self.y_0 = Conv1D(128, 3, strides=1, padding='same')(self.x)
-            self.y_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same')(self.x)
-            self.gated_1 = Multiply()([self.y_0, self.y_1])
+            # 这一部分应该是后续可以改进模型的地方
+            x_0 = Conv1D(128, 3, strides=1, padding='same')(x)
+            x_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same')(x)
+            gated_1 = Multiply()([x_0, x_1])
+
+            # x_0 = Conv1D(128, 4, strides=1, padding='same')(x)
+            # x_1 = Conv1D(128, 4, strides=1, activation="sigmoid", padding='same')(x)
+            # gated_2 = Multiply()([x_0, x_1])
+
+            # x_encode = Concatenate()([gated_0, gated_1])
 
             # 改进1  自编码器
-            self.encode_input = GlobalMaxPooling1D()(self.x)
-            self.encoder_1 = Dense(64, activation='sigmoid')(self.encode_input)
-            self.en_dropout_1 = Dropout(0.5)(self.encoder_1)
-            self.encoder_2 = Dense(16, activation='sigmoid')(self.en_dropout_1)
-            self.en_dropout_2 = Dropout(0.5)(self.encoder_2)
-            self.z_c = Dense(4)(self.en_dropout_2)
-
-            # self.decoder_1 = Dense(16, activation='sigmoid')(self.z_c)
-            # self.de_dropout_1 = Dropout(0.5)(self.decoder_1)
-            # self.decoder_2 = Dense(64, activation='sigmoid')(self.de_dropout_1)
-            # self.de_dropout_2 = Dropout(0.5)(self.decoder_2)
-            # self.recon = Dense(102, activation='sigmoid')(self.decoder_2)
-
-            # self.norm_encode_input = Lambda(lambda x : tf.norm(x, axis= 1, keep_dims= True))(self.encode_input)
-            # self.norm_recon = Lambda(lambda x : tf.norm(x, axis= 1, keep_dims= True))(self.recon)
-            # self.norm_encode_recon_cha = Lambda(lambda x : tf.norm(x, axis= 1, keep_dims= True))(self.encode_input - self.recon)
-            # self.norm_encode_recon_ji = Lambda(lambda x : tf.norm(x, axis= 1, keep_dims= True))(self.encode_input * self.recon)
-
-            # eu_dist = tf.norm(self.encode_input - self.recon, axis= 1, keep_dims= True) / tf.norm(self.encode_input, axis= 1, keep_dims= True)
-            # cos_sim = tf.reduce_sum(self.encode_input * self.recon, axis= 1, keep_dims= True) / (tf.norm(self.encode_input, axis= 1, keep_dims= True) * tf.norm(self.recon, axis= 1, keep_dims= True))
-
-            # self.eu_dist = self.norm_encode_recon_cha / self.norm_encode_input
-            # self.cos_sim = self.norm_encode_recon_ji / (self.norm_encode_input * self.norm_recon)
-            # self.z_r = Concatenate(axis=1)([self.eu_dist, self.cos_sim])
+            # x_tmp_0 = GlobalMaxPooling1D()(x)
+            # encoded = Dense(64, activation='sigmoid')(x_tmp_0)
+            # encoded = Dropout(0.5)(encoded)
+            # encoded = Dense(16, activation='sigmoid')(encoded)
+            # encoded = Dropout(0.5)(encoded)
+            # encoded = Dense(1, activation='sigmoid')(encoded)
             #
-            # self.z = Concatenate(axis=1)([self.z_c, self.z_r])
+            # decoded = Dense(16, activation='sigmoid')(encoded)
+            # decoded = Dropout(0.5)(decoded)
+            # decoded = Dense(64, activation='sigmoid')(decoded)
+            # decoded = Dropout(0.5)(decoded)
+            # decoded = Dense(102, activation='sigmoid')(decoded)
+            #
+            # eu_dist = tf.norm(x_tmp_0 - decoded, axis= 1, keep_dims= True) / tf.norm(x_tmp_0, axis= 1, keep_dims= True)
+            # cos_sim = tf.reduce_sum(x_tmp_0 * decoded, axis= 1, keep_dims= True) / (tf.norm(x_tmp_0, axis= 1, keep_dims= True) * tf.norm(decoded, axis= 1, keep_dims= True))
+            # z_r = Concatenate(axis=1)([eu_dist, cos_sim, encoded])
 
-            self.cat_gate = Concatenate()([self.gated_0, self.gated_1])
-            self.inputData = BatchNormalization(name="batch_normalization_2")(self.cat_gate)
 
-            self.x_lstm = Bidirectional(LSTM(100, return_sequences=True))(self.inputData)
+            x = Concatenate()([gated_0, gated_1])
+            inputData = BatchNormalization(name="batch_normalization_2")(x)
 
-            self.dense_1 = GlobalMaxPooling1D(name="global_max_pooling1d")(self.x_lstm)
-            self.dense_2 = Dense(64, activation='relu')(self.dense_1)
-            self.dropout = Dropout(0.5)(self.dense_2)
-            self.dense_3 = Dense(4)(self.dropout)
+            # 修改原来的参数100为64
+            x_lstm = Bidirectional(LSTM(100, return_sequences=True))(inputData)
+            # x_gru = Bidirectional(GRU(64,return_sequences=True))(inputData)
 
-            # self.fea = Concatenate(axis=1)([self.dense_3, self.z])
-            self.fea = Concatenate(axis=1)([self.dense_3,self.z_c])
-            self.fea = Dropout(0.5)(self.fea)
-            self.fea = Dense(1)(self.fea)
+            # x = Concatenate()([x_lstm, x_gru])
+            x = GlobalMaxPooling1D(name="global_max_pooling1d")(x_lstm)
 
-            self.net_output = Activation('sigmoid')(self.fea)
+            x = Dense(64)(x)
+            x = Activation('relu')(x)
+            x = Dropout(0.5)(x)
+            x = Dense(1)(x)
 
-            model = keras.models.Model(inputs=[self.params_input], outputs=self.net_output)
+            #此处为添加
+            # fea = Concatenate(axis=1)([z_r, x])
+
+            net_output = Activation('sigmoid')(x)
+
+            model = keras.models.Model(inputs=[params_input], outputs=net_output)
             model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
         else:
             model = load_model(model_path)
