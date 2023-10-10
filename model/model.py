@@ -180,6 +180,7 @@ class Model():
         es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
         callbacks_list = [es]
 
+
         # If the program is running on Windows OS, you can remove "use_multiprocessing=True," and "workers=6,".
         model.fit_generator(generator=training_generator,
                             validation_data=validation_generator,
