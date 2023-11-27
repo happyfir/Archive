@@ -7,17 +7,19 @@ import tensorflow as tf
 import keras
 from keras.models import load_model
 from keras.layers import Input, BatchNormalization, Conv1D, Multiply, Concatenate, Bidirectional, LSTM, Embedding, \
-    Lambda
+    Lambda, Add, Conv2D, Subtract, Average
 from keras.layers import GlobalMaxPooling1D, Dense, Activation, Dropout
 from keras.callbacks import EarlyStopping
 from keras.backend.tensorflow_backend import set_session
 from sklearn.model_selection import StratifiedKFold
 #画图相关
 import os
+
+
 os.environ["PATH"] += os.pathsep + 'D:/SoftWare/Graphviz2.38/bin/'
 import seaborn as sns
 sns.set_style('white')
-from sklearn.metrics import roc_curve, auc, accuracy_score
+from sklearn.metrics import roc_curve, auc, accuracy_score, f1_score, precision_score, recall_score
 import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
@@ -31,7 +33,6 @@ set_session(tf.compat.v1.Session(config=config))
 
 #超参数
 max_length = 1000
-
 
 class ClassifyGenerator(keras.utils.Sequence):
     'Generates data for Keras'
@@ -97,12 +98,15 @@ class Model():
         self.start_time = time.time()
 
     #可以使用keras.utils.plot_model()函数绘制模型图
+    #1\消融实验 消融全部2个BatchNormalization
     def get_model(self, model_path=None):
         if model_path is None:
-            self.params_input = Input(shape=(max_length, 102), name="input_layer")# (?,1000,102)
+            self.params_input = Input(shape=(max_length, 102), name="input_layer")  # (?,1000,102)
 
             # 原来的模型
-            self.x = BatchNormalization(name="batch_normalization_1")(self.params_input)
+            # self.x = BatchNormalization(name="batch_normalization_1")(self.params_input)
+            self.x = self.params_input
+
             self.x_0 = Conv1D(128, 2, strides=1, padding='same')(self.x)
             self.x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same')(self.x)
             self.gated_0 = Multiply()([self.x_0, self.x_1])
@@ -110,49 +114,52 @@ class Model():
             self.y_0 = Conv1D(128, 3, strides=1, padding='same')(self.x)
             self.y_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same')(self.x)
             self.gated_1 = Multiply()([self.y_0, self.y_1])
+            # self.gated_1 = Average()([self.y_0, self.y_1])
+
+            self.k_0 = Conv1D(128, 4, strides=1, padding='same')(self.x)
+            self.k_1 = Conv1D(128, 4, strides=1, activation="sigmoid", padding='same')(self.x)
+            self.gated_2 = Multiply()([self.k_0, self.k_1])
+
+            self.k_0 = Conv1D(128, 5, strides=1, padding='same')(self.x)
+            self.k_1 = Conv1D(128, 5, strides=1, activation="sigmoid", padding='same')(self.x)
+            self.gated_3 = Multiply()([self.k_0, self.k_1])
+
+            self.cat_gate = Concatenate()([self.gated_0, self.gated_1, self.gated_2, self.gated_3])
+            # self.inputData = BatchNormalization(name="batch_normalization_2")(self.cat_gate)
+            self.inputData = self.cat_gate
 
             # 改进1  自编码器
-            self.encode_input = GlobalMaxPooling1D()(self.x)
+            # self.encode_input = Average()([self.params_input, self.inputData])
+            self.encode_input = GlobalMaxPooling1D()(self.params_input)
             self.encoder_1 = Dense(64, activation='sigmoid')(self.encode_input)
             self.en_dropout_1 = Dropout(0.5)(self.encoder_1)
             self.encoder_2 = Dense(16, activation='sigmoid')(self.en_dropout_1)
             self.en_dropout_2 = Dropout(0.5)(self.encoder_2)
-            self.z_c = Dense(4)(self.en_dropout_2)
+            self.z_c = Dense(1)(self.en_dropout_2)
 
-            # self.decoder_1 = Dense(16, activation='sigmoid')(self.z_c)
-            # self.de_dropout_1 = Dropout(0.5)(self.decoder_1)
-            # self.decoder_2 = Dense(64, activation='sigmoid')(self.de_dropout_1)
-            # self.de_dropout_2 = Dropout(0.5)(self.decoder_2)
-            # self.recon = Dense(102, activation='sigmoid')(self.decoder_2)
+            self.decoder_1 = Dense(16, activation='sigmoid')(self.z_c)
+            self.de_dropout_1 = Dropout(0.5)(self.decoder_1)
+            self.decoder_2 = Dense(64, activation='sigmoid')(self.de_dropout_1)
+            self.de_dropout_2 = Dropout(0.5)(self.decoder_2)
+            self.recon = Dense(102, activation='sigmoid')(self.decoder_2)
 
-            # self.norm_encode_input = Lambda(lambda x : tf.norm(x, axis= 1, keep_dims= True))(self.encode_input)
-            # self.norm_recon = Lambda(lambda x : tf.norm(x, axis= 1, keep_dims= True))(self.recon)
-            # self.norm_encode_recon_cha = Lambda(lambda x : tf.norm(x, axis= 1, keep_dims= True))(self.encode_input - self.recon)
-            # self.norm_encode_recon_ji = Lambda(lambda x : tf.norm(x, axis= 1, keep_dims= True))(self.encode_input * self.recon)
+            self.dist = Subtract()([self.encode_input, self.recon])
 
-            # eu_dist = tf.norm(self.encode_input - self.recon, axis= 1, keep_dims= True) / tf.norm(self.encode_input, axis= 1, keep_dims= True)
-            # cos_sim = tf.reduce_sum(self.encode_input * self.recon, axis= 1, keep_dims= True) / (tf.norm(self.encode_input, axis= 1, keep_dims= True) * tf.norm(self.recon, axis= 1, keep_dims= True))
-
-            # self.eu_dist = self.norm_encode_recon_cha / self.norm_encode_input
-            # self.cos_sim = self.norm_encode_recon_ji / (self.norm_encode_input * self.norm_recon)
-            # self.z_r = Concatenate(axis=1)([self.eu_dist, self.cos_sim])
-            #
-            # self.z = Concatenate(axis=1)([self.z_c, self.z_r])
-
-            self.cat_gate = Concatenate()([self.gated_0, self.gated_1])
-            self.inputData = BatchNormalization(name="batch_normalization_2")(self.cat_gate)
-
+            # 原来是100，改成64
             self.x_lstm = Bidirectional(LSTM(100, return_sequences=True))(self.inputData)
+            self.x_lstm_1D = GlobalMaxPooling1D(name="global_max_pooling1d")(self.x_lstm)
 
-            self.dense_1 = GlobalMaxPooling1D(name="global_max_pooling1d")(self.x_lstm)
-            self.dense_2 = Dense(64, activation='relu')(self.dense_1)
-            self.dropout = Dropout(0.5)(self.dense_2)
-            self.dense_3 = Dense(4)(self.dropout)
-
-            # self.fea = Concatenate(axis=1)([self.dense_3, self.z])
-            self.fea = Concatenate(axis=1)([self.dense_3,self.z_c])
-            self.fea = Dropout(0.5)(self.fea)
-            self.fea = Dense(1)(self.fea)
+            self.dense_1 = Concatenate()([self.x_lstm_1D, self.dist])
+            # self.dense_1 = self.x_lstm_1D
+            self.dense_2 = Dense(128, activation='relu')(self.dense_1)
+            self.dropout_1 = Dropout(0.5)(self.dense_2)
+            self.dense_3 = Dense(64, activation='relu')(self.dropout_1)
+            self.dropout_2 = Dropout(0.5)(self.dense_3)
+            # self.dense_4 = Dense(2)(self.dropout_2)
+            #
+            # self.fea = Concatenate()([self.dense_4, self.z_c, self.dist])
+            # self.fea = Dropout(0.5)(self.fea)
+            self.fea = Dense(1)(self.dropout_2)
 
             self.net_output = Activation('sigmoid')(self.fea)
 
@@ -253,7 +260,7 @@ if __name__=="__main__":
     X_May = pd.DataFrame(X_May)
 
     #交叉验证
-    n_fold = 4
+    n_fold = 2
     folds = StratifiedKFold(n_splits=n_fold, shuffle=True, random_state=0)
     #这里采用四月的数据训练，五月的数据测试 后续可以使用四月数据测试进行对比
     y = X_Apr.label.ravel()
@@ -267,8 +274,8 @@ if __name__=="__main__":
         x_train, x_val = X.iloc[train_index].reset_index(drop=True), X.iloc[valid_index].reset_index(drop=True)
         y_train, y_val = y[train_index], y[valid_index]
 
-        # 对训练集进行数据污染，如将恶意软件标志改为良性软件
-        # pollute_len = len(x_train) * 0.015  #污染10%的数据
+        #对训练集进行数据污染，如将恶意软件标志改为良性软件
+        # pollute_len = len(x_train) * 0.05  #污染10%的数据
         # n = pollute_len
         # index = 0
         # while (n > 0) and (index <= len(x_train) - 1):
@@ -276,7 +283,7 @@ if __name__=="__main__":
         #         y_train[index] = 1
         #         n = n - 1
         #     index = index + 1
-
+        #
         # 进行训练
         my_model = Model().train(25, 64, x_train, y_train, x_val, y_val, x_test, y_test)
         my_model.save("my_model_" + str(fold_n) + ".h5")
@@ -284,8 +291,12 @@ if __name__=="__main__":
     #绘图
     for fold_n in range(n_fold):
         model_name = "my_model_" + str(fold_n) + ".h5"
+        # model_name = "SVM干扰0.05.h5"
         y_pred = predict(model_name, x_test, y_test)
         print("acc", accuracy_score((y_pred > 0.5).astype('int'), y_test[:len(y_pred)]))
+        print("f1",f1_score((y_pred > 0.5).astype('int'), y_test[:len(y_pred)]))
+        print("precision",precision_score((y_pred > 0.5).astype('int'), y_test[:len(y_pred)]))
+        print("recall",recall_score((y_pred > 0.5).astype('int'), y_test[:len(y_pred)]))
         plot_recall(y_test, y_pred)
 
     #计算结束时间
