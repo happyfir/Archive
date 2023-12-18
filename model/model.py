@@ -98,7 +98,7 @@ class Model():
         self.start_time = time.time()
 
     #可以使用keras.utils.plot_model()函数绘制模型图
-    #1\消融实验 消融全部2个BatchNormalization
+    #SVM干扰
     def get_model(self, model_path=None):
         if model_path is None:
             self.params_input = Input(shape=(max_length, 102), name="input_layer")  # (?,1000,102)
@@ -150,7 +150,7 @@ class Model():
             self.x_lstm_1D = GlobalMaxPooling1D(name="global_max_pooling1d")(self.x_lstm)
 
             self.dense_1 = Concatenate()([self.x_lstm_1D, self.dist])
-            # self.dense_1 = self.x_lstm_1D
+            # self.dense_1 = self.dist
             self.dense_2 = Dense(128, activation='relu')(self.dense_1)
             self.dropout_1 = Dropout(0.5)(self.dense_2)
             self.dense_3 = Dense(64, activation='relu')(self.dropout_1)
@@ -283,7 +283,7 @@ if __name__=="__main__":
         #         y_train[index] = 1
         #         n = n - 1
         #     index = index + 1
-        #
+
         # 进行训练
         my_model = Model().train(25, 64, x_train, y_train, x_val, y_val, x_test, y_test)
         my_model.save("my_model_" + str(fold_n) + ".h5")
