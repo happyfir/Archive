@@ -98,80 +98,61 @@ class Model():
         self.start_time = time.time()
 
     #可以使用keras.utils.plot_model()函数绘制模型图
-    #SVM干扰
+    #模型二 用于模拟其它算法
     def get_model(self, model_path=None):
         if model_path is None:
-            self.params_input = Input(shape=(max_length, 102), name="input_layer")  # (?,1000,102)
+            params_input = Input(shape=(max_length, 102))
 
-            # 原来的模型
-            # self.x = BatchNormalization(name="batch_normalization_1")(self.params_input)
-            self.x = self.params_input
+            x = BatchNormalization()(params_input)
+            x_0 = Conv1D(128, 2, strides=1, padding='same')(x)
+            x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same')(x)
+            gated_0 = Multiply()([x_0, x_1])
 
-            self.x_0 = Conv1D(128, 2, strides=1, padding='same')(self.x)
-            self.x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same')(self.x)
-            self.gated_0 = Multiply()([self.x_0, self.x_1])
+            # 这一部分应该是后续可以改进模型的地方
+            x_0 = Conv1D(128, 3, strides=1, padding='same')(x)
+            x_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same')(x)
 
-            self.y_0 = Conv1D(128, 3, strides=1, padding='same')(self.x)
-            self.y_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same')(self.x)
-            self.gated_1 = Multiply()([self.y_0, self.y_1])
-            # self.gated_1 = Average()([self.y_0, self.y_1])
-
-            self.k_0 = Conv1D(128, 4, strides=1, padding='same')(self.x)
-            self.k_1 = Conv1D(128, 4, strides=1, activation="sigmoid", padding='same')(self.x)
-            self.gated_2 = Multiply()([self.k_0, self.k_1])
-
-            self.k_0 = Conv1D(128, 5, strides=1, padding='same')(self.x)
-            self.k_1 = Conv1D(128, 5, strides=1, activation="sigmoid", padding='same')(self.x)
-            self.gated_3 = Multiply()([self.k_0, self.k_1])
-
-            self.cat_gate = Concatenate()([self.gated_0, self.gated_1, self.gated_2, self.gated_3])
-            # self.inputData = BatchNormalization(name="batch_normalization_2")(self.cat_gate)
-            self.inputData = self.cat_gate
+            gated_1 = Multiply()([x_0, x_1])
 
             # 改进1  自编码器
-            # self.encode_input = Average()([self.params_input, self.inputData])
-            self.encode_input = GlobalMaxPooling1D()(self.params_input)
-            self.encoder_1 = Dense(64, activation='sigmoid')(self.encode_input)
-            self.en_dropout_1 = Dropout(0.5)(self.encoder_1)
-            self.encoder_2 = Dense(16, activation='sigmoid')(self.en_dropout_1)
-            self.en_dropout_2 = Dropout(0.5)(self.encoder_2)
-            self.z_c = Dense(1)(self.en_dropout_2)
+            x_tmp_0 = GlobalMaxPooling1D()(gated_0)
+            encoded_0 = Dense(256, activation='tanh')(x_tmp_0)
+            encoded_0 = Dropout(0.5)(encoded_0)
+            encoded_0 = Dense(128, activation='tanh')(encoded_0)
+            encoded_0 = Dropout(0.5)(encoded_0)
+            encoded_0 = Dense(50, activation='tanh')(encoded_0)
 
-            self.decoder_1 = Dense(16, activation='sigmoid')(self.z_c)
-            self.de_dropout_1 = Dropout(0.5)(self.decoder_1)
-            self.decoder_2 = Dense(64, activation='sigmoid')(self.de_dropout_1)
-            self.de_dropout_2 = Dropout(0.5)(self.decoder_2)
-            self.recon = Dense(102, activation='sigmoid')(self.decoder_2)
+            x_tmp_1 = GlobalMaxPooling1D()(gated_1)
+            encoded_1 = Dense(256, activation='tanh')(x_tmp_1)
+            encoded_1 = Dropout(0.5)(encoded_1)
+            encoded_1 = Dense(128, activation='tanh')(encoded_1)
+            encoded_1 = Dropout(0.5)(encoded_1)
+            encoded_1 = Dense(50, activation='tanh')(encoded_1)
 
-            self.dist = Subtract()([self.encode_input, self.recon])
+            x = Concatenate()([gated_0, gated_1])
+            x = BatchNormalization()(x)
 
-            # 原来是100，改成64
-            self.x_lstm = Bidirectional(LSTM(100, return_sequences=True))(self.inputData)
-            self.x_lstm_1D = GlobalMaxPooling1D(name="global_max_pooling1d")(self.x_lstm)
+            x = Bidirectional(LSTM(100, return_sequences=True))(x)
 
-            self.dense_1 = Concatenate()([self.x_lstm_1D, self.dist])
-            # self.dense_1 = self.dist
-            self.dense_2 = Dense(128, activation='relu')(self.dense_1)
-            self.dropout_1 = Dropout(0.5)(self.dense_2)
-            self.dense_3 = Dense(64, activation='relu')(self.dropout_1)
-            self.dropout_2 = Dropout(0.5)(self.dense_3)
-            # self.dense_4 = Dense(2)(self.dropout_2)
-            #
-            # self.fea = Concatenate()([self.dense_4, self.z_c, self.dist])
-            # self.fea = Dropout(0.5)(self.fea)
-            self.fea = Dense(1)(self.dropout_2)
+            x = GlobalMaxPooling1D()(x)
 
-            self.net_output = Activation('sigmoid')(self.fea)
+            x = Concatenate()([x, encoded_0, encoded_1])
+            x = Dense(64)(x)
+            x = Activation('relu')(x)
+            x = Dropout(0.5)(x)
+            x = Dense(1)(x)
 
-            model = keras.models.Model(inputs=[self.params_input], outputs=self.net_output)
+            # net_output = Activation('sigmoid')(x)
+            net_output = Activation('sigmoid')(x)
+
+            model = keras.models.Model(inputs=[params_input], outputs=net_output)
             model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
         else:
             model = load_model(model_path)
 
         model.summary()
-
-        keras.utils.vis_utils.plot_model(model, to_file='./struct_model/model_init.png',
-                                         show_shapes=True)
+        # keras.utils.vis_utils.plot_model(model, to_file='./model_struct/model_autocode_after_conv1d.png',
+        #                                  show_shapes=True)
         return model
 
     def train(self, max_epoch, batch_size, x_train, y_train, x_val, y_val, x_test, y_test):
@@ -275,14 +256,14 @@ if __name__=="__main__":
         y_train, y_val = y[train_index], y[valid_index]
 
         #对训练集进行数据污染，如将恶意软件标志改为良性软件
-        # pollute_len = len(x_train) * 0.05  #污染10%的数据
-        # n = pollute_len
-        # index = 0
-        # while (n > 0) and (index <= len(x_train) - 1):
-        #     if(y_train[index] == 0):
-        #         y_train[index] = 1
-        #         n = n - 1
-        #     index = index + 1
+        pollute_len = len(x_train) * 0.05  #污染10%的数据
+        n = pollute_len
+        index = 0
+        while (n > 0) and (index <= len(x_train) - 1):
+            if(y_train[index] == 0):
+                y_train[index] = 1
+                n = n - 1
+            index = index + 1
 
         # 进行训练
         my_model = Model().train(25, 64, x_train, y_train, x_val, y_val, x_test, y_test)
