@@ -2,6 +2,9 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+from pylab import *
+mpl.rcParams['font.sans-serif']=['SimHei']
+mpl.rcParams['axes.unicode_minus']=False
 
 plt.figure(figsize=(7, 5), dpi=180)
 
@@ -19,10 +22,10 @@ total_width, n = 0.8, 4
 width = total_width / n
 x = x - (total_width - width) / 2
 
-plt.bar(x, a, width=width, label='kernel = 2')
-plt.bar(x + width, b, width=width, label='kernel = 2,3')
-plt.bar(x + width + width, c, width=width, label='kernel = 2,3,4(proposed)')
-plt.bar(x + width + width + width, d, width=width, label='kernel = 2,3,4,5')
+plt.bar(x, a, width=width, label='卷积核：2')
+plt.bar(x + width, b, width=width, label='卷积核：2,3')
+plt.bar(x + width + width, c, width=width, label='卷积核：2,3,4(Mal-CLAM)')
+plt.bar(x + width + width + width, d, width=width, label='卷积核：2,3,4,5')
 
 # 在左侧显示图例
 plt.legend(loc="upper right")
@@ -30,7 +33,7 @@ plt.legend(loc="upper right")
 # 设置标题
 # plt.title("Comparison of Precision and False Alarm Rate\n When Using Different Feature Schemes")
 # 为两条坐标轴设置名称
-plt.ylabel("Convolutional Module")
+plt.ylabel("卷积模块")
 
 aaa = ['ACC', 'AUC', 'Recall', 'F1-score']
 bbb = range(4)

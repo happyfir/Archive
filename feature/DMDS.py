@@ -297,7 +297,8 @@ class DMDS(object):
     def convert(self):
         processes = {}
         try:
-            procs = self.behaviour_report['behavior']['processes']
+            # procs = self.behaviour_report['behavior']['processes']
+            procs = self.behaviour_report['processes']
             for proc in procs:
                 process_id = proc['pid']
                 parent_id = proc['ppid']
@@ -333,9 +334,9 @@ class DMDS(object):
 
 
 if __name__ == '__main__':
-    file_name = '0FA68B45B3BFEEF29D14A8E5965F27A979A66A2E47AB9F5A896E651685906F92_388623_0'
-    input_path = "/Users/admin/Data/json/{0}.json"
-    output_path = "/Users/admin/Data/npy/{0}.npy"
+    file_name = '8FFCD330EDAEFAC6320E9D00D39EDBE2D396BCC5FE4D55EFC1D5082B78E9500D_180252_1'
+    input_path = "D:/test/{0}.json"
+    output_path = "D:/test/{0}.npy"
     dmds = DMDS(file_name, input_path, output_path, 1000, 40)
     if dmds.parse() and dmds.convert():
         dmds.write()

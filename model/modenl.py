@@ -32,7 +32,7 @@ tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config))
 # set_session(tf.compat.v1.Session(config=config))
 
 #超参数
-max_length = 500
+max_length = 1000
 
 class ClassifyGenerator(keras.utils.Sequence):
     'Generates data for Keras'
@@ -102,8 +102,6 @@ class Model():
         if model_path is None:
             self.params_input = Input(shape=(max_length, 102), name="input_layer")  # (?,1000,102)
 
-            # self.atten = Attention()([self.params_input,self.params_input])
-
             # 原来的模型
             self.x = BatchNormalization(name="batch_normalization_1")(self.params_input)
 
@@ -111,41 +109,42 @@ class Model():
             self.x_1 = Conv1D(128, 2, strides=1, activation="sigmoid", padding='same')(self.x)
             self.gated_0 = Multiply()([self.x_0, self.x_1])
 
-            self.y_0 = Conv1D(128, 3, strides=1, padding='same')(self.x)
-            self.y_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same')(self.x)
-            self.gated_1 = Multiply()([self.y_0, self.y_1])
-            # self.gated_1 = Average()([self.y_0, self.y_1])
+            # self.y_0 = Conv1D(128, 3, strides=1, padding='same')(self.x)
+            # self.y_1 = Conv1D(128, 3, strides=1, activation="sigmoid", padding='same')(self.x)
+            # self.gated_1 = Multiply()([self.y_0, self.y_1])
+            # # self.gated_1 = Average()([self.y_0, self.y_1])
+            #
+            # self.k_0 = Conv1D(128, 4, strides=1, padding='same')(self.x)
+            # self.k_1 = Conv1D(128, 4, strides=1, activation="sigmoid", padding='same')(self.x)
+            # self.gated_2 = Multiply()([self.k_0, self.k_1])
 
-            self.k_0 = Conv1D(128, 4, strides=1, padding='same')(self.x)
-            self.k_1 = Conv1D(128, 4, strides=1, activation="sigmoid", padding='same')(self.x)
-            self.gated_2 = Multiply()([self.k_0, self.k_1])
+            # self.cat_gate = Concatenate()([self.gated_0, self.gated_1, self.gated_2])
+            self.inputData = BatchNormalization(name="batch_normalization_2")(self.gated_0)
 
-            self.cat_gate = Concatenate()([self.gated_0, self.gated_1, self.gated_2])
-            self.inputData = BatchNormalization(name="batch_normalization_2")(self.cat_gate)
-
-            # 改进1  自编码器
-            # self.encode_input = Average()([self.params_input, self.inputData])
+            # # 改进1  自编码器
+            # # self.encode_input = Average()([self.params_input, self.inputData])
             self.encode_input = GlobalMaxPooling1D()(self.params_input)
-            self.encoder_1 = Dense(64, activation='sigmoid')(self.encode_input)
-            self.en_dropout_1 = Dropout(0.5)(self.encoder_1)
-            self.encoder_2 = Dense(16, activation='sigmoid')(self.en_dropout_1)
-            self.en_dropout_2 = Dropout(0.5)(self.encoder_2)
-            self.z_c = Dense(1)(self.en_dropout_2)
-
-            self.decoder_1 = Dense(16, activation='sigmoid')(self.z_c)
-            self.de_dropout_1 = Dropout(0.5)(self.decoder_1)
-            self.decoder_2 = Dense(64, activation='sigmoid')(self.de_dropout_1)
-            self.de_dropout_2 = Dropout(0.5)(self.decoder_2)
-            self.recon = Dense(102, activation='sigmoid')(self.decoder_2)
-
-            self.dist = Subtract()([self.encode_input, self.recon])
+            # self.encoder_1 = Dense(64, activation='sigmoid')(self.encode_input)
+            # self.en_dropout_1 = Dropout(0.5)(self.encoder_1)
+            # self.encoder_2 = Dense(16, activation='sigmoid')(self.en_dropout_1)
+            # self.en_dropout_2 = Dropout(0.5)(self.encoder_2)
+            # self.z_c = Dense(1)(self.en_dropout_2)
+            #
+            # self.decoder_1 = Dense(16, activation='sigmoid')(self.z_c)
+            # self.de_dropout_1 = Dropout(0.5)(self.decoder_1)
+            # self.decoder_2 = Dense(64, activation='sigmoid')(self.de_dropout_1)
+            # self.de_dropout_2 = Dropout(0.5)(self.decoder_2)
+            # self.recon = Dense(102, activation='sigmoid')(self.decoder_2)
+            #
+            # self.dist = Subtract()([self.encode_input, self.recon])
 
 
             # 原来是100，改成64
             self.x_lstm = Bidirectional(LSTM(100, return_sequences=True))(self.inputData)
+            # self.x_lstm = LSTM(units=100,return_sequences=True)(self.inputData)
             self.x_lstm_1D = GlobalMaxPooling1D(name="global_max_pooling1d")(self.x_lstm)
 
-            self.dense_1 = Concatenate()([self.x_lstm_1D, self.dist])
+            self.dense_1 = Concatenate()([self.x_lstm_1D, self.encode_input])
 
             # self.dense_1 = self.x_lstm_1D
             self.dense_2 = Dense(128, activation='relu')(self.dense_1)

@@ -30,7 +30,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
 #set_session(tf.Session(config=config))
-set_session(tf.compat.v1.Session(config=config))
+# set_session(tf.compat.v1.Session(config=config))
+tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config))
 
 #超参数
 max_length = 1000
@@ -266,8 +267,8 @@ if __name__=="__main__":
     MalCLAM = load_model(model_name)
     dim = 1000
     #201705_0 (51,102)
-    base_path = "../Dataset/dataset/dataset/{0}.npy"
-    npy_name = "201705_9998"
+    base_path = "D:/test/{0}.npy"
+    npy_name = "8FFCD330EDAEFAC6320E9D00D39EDBE2D396BCC5FE4D55EFC1D5082B78E9500D_180252_1"
     sample = np.load(base_path.format(npy_name))
     # sample = np.expand_dims(sample,axis=0)
     sample = np.clip(sample, -100, 100)
